@@ -16,13 +16,15 @@
 #ifndef __MAIN_H
 #define __MAIN_H
 
+#include "board.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f1xx_hal.h"
+#include "stm32f_board_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -107,7 +109,9 @@ void LED_Init();
 void TF4_Init();
 void RAIN_Sensor_Init();
 void PAC5210RESET_Init();
+#if BOARD_YARDFORCE500_VARIANT_ORIG
 void MASTER_USART_Init();
+#endif
 void DRIVEMOTORS_USART_Init();
 void SystemClock_Config();
 void ADC1_Init(void);
@@ -118,7 +122,9 @@ void MX_DMA_Init(void);
 void Emergency_Init(void);
 
 // UART Wrapper functions to hide HAL bullshit ...
+#if BOARD_YARDFORCE500_VARIANT_ORIG
 void MASTER_Transmit(uint8_t *buffer, uint8_t len);
+#endif
 void DRIVEMOTORS_Transmit(uint8_t *buffer, uint8_t len);
 
 // Sensor Wrapper functions
