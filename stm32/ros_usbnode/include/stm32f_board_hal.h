@@ -1,6 +1,5 @@
 #ifndef __STM32F_BOARD_HAL_H
 #define __STM32F_BOARD_HAL_H
-#include "board.h"
 
 #ifdef __cplusplus
 extern "C" {

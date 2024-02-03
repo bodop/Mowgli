@@ -142,30 +142,24 @@ void DRIVEMOTOR_Init(void)
     // enable port and usart clocks
     DRIVEMOTORS_USART_GPIO_CLK_ENABLE();
     DRIVEMOTORS_USART_USART_CLK_ENABLE();
-
+    
+#if BOARD_YARDFORCE500_VARIANT_ORIG
     // RX
-#if BOARD_YARDFORCE500_VARIANT_B
-    GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
-    GPIO_InitStruct.Pin = DRIVEMOTORS_USART_TX_PIN|DRIVEMOTORS_USART_RX_PIN;
-#else
     GPIO_InitStruct.Pin = DRIVEMOTORS_USART_RX_PIN;
-#endif
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
     HAL_GPIO_Init(DRIVEMOTORS_USART_RX_PORT, &GPIO_InitStruct);
+#endif
 
     // TX
-#if BOARD_YARDFORCE500_VARIANT_B
-    GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
-    GPIO_InitStruct.Pin = DRIVEMOTORS_USART_TX_PIN|DRIVEMOTORS_USART_RX_PIN;
-#else
     GPIO_InitStruct.Pin = DRIVEMOTORS_USART_TX_PIN;
-#endif
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     // GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
 #if BOARD_YARDFORCE500_VARIANT_B
+    // F401 configures RS/TX in same step
+    GPIO_InitStruct.Pin |= DRIVEMOTORS_USART_RX_PIN;
     GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
 #endif
     HAL_GPIO_Init(DRIVEMOTORS_USART_TX_PORT, &GPIO_InitStruct);
@@ -176,15 +170,20 @@ void DRIVEMOTOR_Init(void)
     __HAL_AFIO_REMAP_USART2_ENABLE();
 #endif
 
-    DRIVEMOTORS_USART_Handler.Instance = DRIVEMOTORS_USART_INSTANCE; // USART2
-    DRIVEMOTORS_USART_Handler.Init.BaudRate = 115200;                // Baud rate
-    DRIVEMOTORS_USART_Handler.Init.WordLength = UART_WORDLENGTH_8B;  // The word is  8  Bit format
-    DRIVEMOTORS_USART_Handler.Init.StopBits = USART_STOPBITS_1;      // A stop bit
-    DRIVEMOTORS_USART_Handler.Init.Parity = UART_PARITY_NONE;        // No parity bit
-    DRIVEMOTORS_USART_Handler.Init.HwFlowCtl = UART_HWCONTROL_NONE;  // No hardware flow control
-    DRIVEMOTORS_USART_Handler.Init.Mode = USART_MODE_TX_RX;          // Transceiver mode
-
-    HAL_UART_Init(&DRIVEMOTORS_USART_Handler);
+    DRIVEMOTORS_USART_Handler.Instance = DRIVEMOTORS_USART_INSTANCE;// USART2
+    DRIVEMOTORS_USART_Handler.Init.BaudRate = 115200;               // Baud rate
+    DRIVEMOTORS_USART_Handler.Init.WordLength = UART_WORDLENGTH_8B; // The word is  8  Bit format
+    DRIVEMOTORS_USART_Handler.Init.StopBits = USART_STOPBITS_1;     // A stop bit
+    DRIVEMOTORS_USART_Handler.Init.Parity = UART_PARITY_NONE;       // No parity bit
+    DRIVEMOTORS_USART_Handler.Init.HwFlowCtl = UART_HWCONTROL_NONE; // No hardware flow control
+    DRIVEMOTORS_USART_Handler.Init.Mode = USART_MODE_TX_RX;         // Transceiver mode
+#if BOARD_YARDFORCE500_VARIANT_B
+    DRIVEMOTORS_USART_Handler.Init.OverSampling = UART_OVERSAMPLING_16;
+#endif
+    if (HAL_UART_Init(&DRIVEMOTORS_USART_Handler) != HAL_OK)
+    {
+      Error_Handler();
+    } 
 
     /* USART2 DMA Init */
     /* USART2_RX Init */
