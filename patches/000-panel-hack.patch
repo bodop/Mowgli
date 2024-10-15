@@ -1,0 +1,272 @@
+Index: Mowgli/stm32/ros_usbnode/include/panel.h
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/include/panel.h
++++ Mowgli/stm32/ros_usbnode/include/panel.h
+@@ -124,11 +124,21 @@ typedef enum
+ #define PANEL_BUTTON_DEF_START PANEL_BUTTON_BYTES
+ #define PANEL_BUTTON_DEF_HOME (PANEL_BUTTON_BYTES+1)
+ 
++typedef enum {
++    PANEL_STATE_NEEDS_RESET,
++    PANEL_STATE_WARMUP,
++    PANEL_STATE_NEGOTIATE_VERSION,
++    PANEL_STATE_CONFIRM_VERSION,
++    PANEL_STATE_RUNNING,
++} PANEL_STATE;
++
++#define PANEL_MAX_RETRIES 20
+    
+ 
+ extern UART_HandleTypeDef PANEL_USART_Handler;
+ 
+ void PANEL_Init(void);
++void panel_check_recvd(void);
+ void PANEL_Tick(void);
+ 
+ void PANEL_Set_LED(uint8_t led, PANEL_LED_STATE state);
+Index: Mowgli/stm32/ros_usbnode/src/main.c
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/src/main.c
++++ Mowgli/stm32/ros_usbnode/src/main.c
+@@ -206,7 +206,7 @@ int main(void)
+   DB_TRACE(" * ROS serial node initialized\r\n");
+   DB_TRACE("\r\n\e[01;36m >>> entering main loop ...\e[0m\r\n\r\n");
+   // <chirp><chirp> means we are in the main loop
+-  chirp(2);
++  //chirp(2);
+ 
+   WATCHDOG_vInit();
+   
+@@ -214,6 +214,7 @@ int main(void)
+   {
+     chatter_handler();
+     motors_handler();
++    panel_check_recvd();
+     panel_handler();
+     spinOnce();
+     broadcast_handler();
+@@ -260,7 +261,7 @@ int main(void)
+       BLADEMOTOR_App();
+ 
+ #ifdef OPTION_PERIMETER
+-      if (!Perimeter_UsesDebug())
++      if (!Perimeter_UsesDebug() && 0)
+ #endif
+       {
+         uint32_t currentTick;
+Index: Mowgli/stm32/ros_usbnode/src/panel.c
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/src/panel.c
++++ Mowgli/stm32/ros_usbnode/src/panel.c
+@@ -52,8 +52,9 @@ static uint8_t Frame_Received_Panel = 0;
+ const uint8_t KEY_ACTIVATE[] = {0x0, 0x0, 0x1};
+ static uint8_t panel_pu8ReceivedData[50] = {0};
+ static uint8_t panel_pu8RqstMessage[50]  = {0};
+-
+-const uint8_t panel_pcu8PreAmbule[5]  = {0x55,0xAA,0x0A,0x50,0x3C};
++static int panel_recvd;
++static PANEL_STATE panel_state;
++static int panel_retries;
+ 
+ static uint8_t panel_u8OldStateButtonStart = 0;
+ static uint8_t panel_u8OldStateButtonHome = 0;
+@@ -173,41 +174,12 @@ void PANEL_Init(void)
+ 
+     /* TODO maybe put this sequence in the loop */
+     memset(Led_States, 0x0, LED_STATE_SIZE);       // all LEDs OFF
+-    // Initialize Panel Sequence
+-    PANEL_Send_Message(NULL, 0, 0xffff);
+-    HAL_Delay(100);
+-    PANEL_Send_Message(NULL, 0, 0xfffe);
+-    HAL_Delay(100);    
+-    PANEL_Send_Message((uint8_t*)KEY_INIT_MSG, sizeof(KEY_INIT_MSG), 0xfffd);
+-    HAL_Delay(100);
+-    PANEL_Send_Message(NULL, 0, 0xfffb);
+-    HAL_Delay(100);
+-    // knight rider <3
+-    uint8_t i,j=0;
+-    for (j=0;j<2;j++)
+-    {
+-        for (i=4;i<11;i++)
+-        {
+-            memset(Led_States, 0x0, LED_STATE_SIZE);
+-            PANEL_Set_LED(i, PANEL_LED_ON);
+-            PANEL_SendLEDMessage();
+-            HAL_Delay(50);
+-        }
+-        for (i=11;i>=4;i--)
+-        {
+-            memset(Led_States, 0x0, LED_STATE_SIZE);
+-            PANEL_Set_LED(i, PANEL_LED_ON);
+-            PANEL_SendLEDMessage();
+-            HAL_Delay(50);
+-        }
+-    }
+-    // all off
+-    HAL_Delay(50);
+-    memset(Led_States, 0x0, LED_STATE_SIZE);    
+-    PANEL_SendLEDMessage();
+ 
+     /* prepare to receive the next message */
+-    HAL_UARTEx_ReceiveToIdle_DMA(&PANEL_USART_Handler,panel_pu8ReceivedData,PANEL_LENGTH_RECEIVED_MSG);
++    panel_state=PANEL_STATE_NEEDS_RESET;
++    panel_retries=PANEL_MAX_RETRIES;
++    panel_recvd=-1;
++    HAL_UARTEx_ReceiveToIdle_DMA(&PANEL_USART_Handler,panel_pu8ReceivedData,sizeof(panel_pu8ReceivedData));
+     __HAL_DMA_DISABLE_IT(&hdma_uart1_rx, DMA_IT_HT);
+ 
+ #endif
+@@ -244,6 +216,49 @@ void PANEL_Set_LED(uint8_t led, PANEL_LE
+  */
+ void PANEL_Tick(void)
+ {   
++#ifdef PANEL_USART_ENABLED   
++    static PANEL_STATE max_panel_state=PANEL_STATE_NEEDS_RESET;
++    static int knight_rider=29;
++
++    if (panel_state>max_panel_state) {
++        max_panel_state=panel_state;
++        chirp(1);
++    }
++    if (panel_state!=PANEL_STATE_RUNNING) {
++        if (panel_retries>0) {
++            panel_retries--;
++            switch (panel_state) {
++            default:
++                panel_state=PANEL_STATE_NEEDS_RESET;
++            case PANEL_STATE_NEEDS_RESET:
++                PANEL_Send_Message(NULL, 0, 0xffff);
++                break;
++            case PANEL_STATE_WARMUP:
++                PANEL_Send_Message(NULL, 0, 0xfffe);
++                break;
++            case PANEL_STATE_NEGOTIATE_VERSION:
++                PANEL_Send_Message((uint8_t*)KEY_INIT_MSG, sizeof(KEY_INIT_MSG), 0xfffd);
++                break;
++            case PANEL_STATE_CONFIRM_VERSION:
++                PANEL_Send_Message(NULL, 0, 0xfffb);
++                break;
++            }
++        }
++        return;
++    }
++
++    /* For historic reasons, we play a "knight rider" animation on startup */
++    if (knight_rider) {
++        knight_rider--;
++        int round=knight_rider/7;
++        int led=knight_rider-round*7;
++        if (round & 1) led=7-led;
++        PANEL_Set_LED(led+4, PANEL_LED_ON);
++        PANEL_SendLEDMessage();
++        memset(Led_States, 0x0, LED_STATE_SIZE);
++        return;
++    }
++
+      if (Frame_Received_Panel == 1)
+      {
+             if ((panel_pu8ReceivedData[5]&0x1) == 0) // any button pressed
+@@ -270,6 +285,8 @@ void PANEL_Tick(void)
+     
+       Frame_Received_Panel=0;
+      }
++#endif
++
+     /* add Start and Home at the end the tab*/
+     buttonstate[PANEL_BUTTON_DEF_START] = !HAL_GPIO_ReadPin(PLAY_BUTTON_PORT, PLAY_BUTTON_PIN); // pullup, active low    
+     buttonstate[PANEL_BUTTON_DEF_HOME]  = !HAL_GPIO_ReadPin(HOME_BUTTON_PORT, HOME_BUTTON_PIN); // pullup, active low    
+@@ -360,26 +377,77 @@ void PANEL_Send_Message(uint8_t *data, u
+ #endif
+ }
+ 
+-
+-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+-{
+-	if (huart->Instance == PANEL_USART_INSTANCE)
+-	{
+-        /* take only the buttons message */
+-        if(Size == PANEL_LENGTH_RECEIVED_MSG ){
+-                    /* decode the frame */
+-            if(memcmp(panel_pcu8PreAmbule,panel_pu8ReceivedData,5) == 0){
+-                uint8_t l_u8crc = crcCalc(panel_pu8ReceivedData,14-1);
+-                if(panel_pu8ReceivedData[14-1] == l_u8crc ){
+-                    Frame_Received_Panel = 1;
+-                }
++void panel_check_recvd(void) {
++    if (panel_recvd<0) return;
++    uint8_t *r=panel_pu8ReceivedData;
++    uint8_t *max_start=r+panel_recvd-5;
++    while (r<=max_start) {
++        /* Search message start */
++        if (*r++!=0x55) continue;
++        if (*r++!=0xaa) continue;
++
++        int len=*r++;
++        if (r+len>=panel_pu8ReceivedData+sizeof(panel_pu8ReceivedData)) {
++            debug_printf("Message too long\n");
++            continue;
++        }
++        uint8_t crc=0xff+len+crcCalc(r,len);
++        if (r[len]!=crc) {
++            debug_printf("CRC wrong (%x!=%x)\n",r[len],crc);
++            continue;
++        }
++        uint16_t cmd=(*(r++))<<8;
++        cmd+=*(r++);
++        /* Now len is the length of the command's data bytes */
++        len-=2;
++        switch (cmd) {
++        case 0xffff:
++            if (panel_state==PANEL_STATE_NEEDS_RESET) {
++                panel_state=PANEL_STATE_WARMUP;
++                panel_retries=PANEL_MAX_RETRIES;
++            }
++            break;
++        case 0xfffe:
++            if (panel_state==PANEL_STATE_WARMUP) {
++                panel_state=PANEL_STATE_NEGOTIATE_VERSION;
++                panel_retries=PANEL_MAX_RETRIES;
++            }
++            break;
++        case 0xfffd:
++            if (panel_state==PANEL_STATE_NEGOTIATE_VERSION) {
++                panel_state=PANEL_STATE_CONFIRM_VERSION;
++                panel_retries=PANEL_MAX_RETRIES;
+             }
++            break;
++        case 0xfffb:
++            if (panel_state==PANEL_STATE_CONFIRM_VERSION) {
++                panel_state=PANEL_STATE_RUNNING;
++            }
++            break;
++        case 0x503c:
++            Frame_Received_Panel=1; // TODO parse message here
++            break;
++        case 0x4001: // Seen with one data byte
++        case 0x501d: // Seen with no data
++        case 0x5084: // Key activate response Seen with one data byte
++            break; // Ignored commands
++        default:
++            debug_printf("Unhandled command %x",cmd);
++            for (int i=0; i<len; i++) debug_printf(" %02x",r[i]);
++            debug_printf("\n");
++            break;
+         }
++        r+=len+1;
++    }
++    panel_recvd=-1;
+ 
++    /* prepare to receive the next message */
++    HAL_UARTEx_ReceiveToIdle_DMA(&PANEL_USART_Handler,panel_pu8ReceivedData,sizeof(panel_pu8ReceivedData));
++    __HAL_DMA_DISABLE_IT(&hdma_uart1_rx, DMA_IT_HT);
++}
+ 
+-        /* prepare to receive the next message */
+-        HAL_UARTEx_ReceiveToIdle_DMA(&PANEL_USART_Handler,panel_pu8ReceivedData,PANEL_LENGTH_RECEIVED_MSG);
+-        __HAL_DMA_DISABLE_IT(&hdma_uart1_rx, DMA_IT_HT);
++void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
++	if (huart->Instance!=PANEL_USART_INSTANCE) return;
+ 
+-	}
++    panel_recvd=Size;
+ }

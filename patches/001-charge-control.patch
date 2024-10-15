@@ -1,0 +1,270 @@
+Index: Mowgli/stm32/ros_usbnode/include/board.h
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/include/board.h
++++ Mowgli/stm32/ros_usbnode/include/board.h
+@@ -96,12 +96,10 @@ extern "C"
+ 
+ /// nominal max charge current is 1.0 Amp
+ #define MAX_CHARGE_CURRENT 1.0f
+-/// limite voltag when switching in 150mA mode
+-#define LIMIT_VOLTAGE_150MA 28.0f
+ /// Max voltage allowed 29.4
+-#define MAX_CHARGE_VOLTAGE 29.0f
+-/// Max battery voltage allowed
+-#define BAT_CHARGE_CUTOFF_VOLTAGE 28.0f
++#define MAX_CHARGE_VOLTAGE 29.4f
++/// Default max battery voltage allowed
++#define BAT_CHARGE_DEFAULT_CUTOFF_VOLTAGE 28.0f
+ /// We consider the battery is full when in CV mode the current below 0.1A
+ #define CHARGE_END_LIMIT_CURRENT 0.08f
+ // if voltage is greater than this assume we are docked
+Index: Mowgli/stm32/ros_usbnode/include/charger.h
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/include/charger.h
++++ Mowgli/stm32/ros_usbnode/include/charger.h
+@@ -47,6 +47,10 @@ extern "C" {
+ 
+  void TIM1_Init(void);
+ 
++ /**
++  * Sets the charge limit.
++  */
++ void charger_set_end_voltage(float v);
+ 
+ 
+ #ifdef __cplusplus
+Index: Mowgli/stm32/ros_usbnode/src/charger.c
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/src/charger.c
++++ Mowgli/stm32/ros_usbnode/src/charger.c
+@@ -47,6 +47,9 @@ float SOC                           = 0;
+ uint16_t chargecontrol_pwm_val      = 0;
+ uint8_t  chargecontrol_is_charging  = 0;
+ 
++static CHARGER_STATE_e charger_state = CHARGER_STATE_IDLE;
++static float charge_end_voltage=BAT_CHARGE_DEFAULT_CUTOFF_VOLTAGE;
++
+ /******************************************************************************
+  * Function Prototypes
+  *******************************************************************************/
+@@ -156,6 +159,20 @@ uint8_t  chargecontrol_is_charging  = 0;
+   DB_TRACE(" * Charge Controler PWM Timers initialized\r\n");
+ }
+ 
++ void charger_set_end_voltage(float v) {
++    /* Limit input to reasonable values. */
++    if (v>MAX_CHARGE_VOLTAGE) {
++      v=MAX_CHARGE_VOLTAGE;
++    } else if (v<LOW_BAT_THRESHOLD) {
++      v=LOW_BAT_THRESHOLD;
++    }
++    /* Go back to constant current, if voltage is increased. */
++    if (v>charge_end_voltage && charger_state==CHARGER_STATE_CHARGING_CV) {
++      charger_state=CHARGER_STATE_CHARGING_CC;
++    }
++    charge_end_voltage=v;
++ }
++
+ /*
+  * manages the charge voltage, and charge, lowbat LED
+  * improvementt need to be done to avoid sparks when connected charger and disconnected 
+@@ -164,7 +181,6 @@ uint8_t  chargecontrol_is_charging  = 0;
+  */
+ void ChargeController(void)
+ {                        
+-  static CHARGER_STATE_e charger_state = CHARGER_STATE_IDLE;
+   static uint32_t timestamp = 0;
+ 
+   /*charger disconnected force idle state*/
+@@ -195,16 +211,16 @@ void ChargeController(void)
+ 
+     case CHARGER_STATE_CHARGING_CC:
+         // cap charge current at 1.5 Amps
+-        if ((battery_voltage > BAT_CHARGE_CUTOFF_VOLTAGE && (chargecontrol_pwm_val > 0)) || ((current > MAX_CHARGE_CURRENT) && (chargecontrol_pwm_val > 39)))
++        if ((battery_voltage > charge_end_voltage && (chargecontrol_pwm_val > 0)) || ((current > MAX_CHARGE_CURRENT) && (chargecontrol_pwm_val > 39)))
+         {
+             chargecontrol_pwm_val--;
+         }
+-        if ((battery_voltage < BAT_CHARGE_CUTOFF_VOLTAGE) && (current < MAX_CHARGE_CURRENT) && (chargecontrol_pwm_val < 1350))
++        if ((battery_voltage < charge_end_voltage) && (current < MAX_CHARGE_CURRENT) && (chargecontrol_pwm_val < 1350))
+         {
+             chargecontrol_pwm_val++;
+         }
+ 
+-        if(charge_voltage >= (LIMIT_VOLTAGE_150MA )){
++        if(charge_voltage >= charge_end_voltage) {
+             charger_state = CHARGER_STATE_CHARGING_CV;
+         }
+ 
+@@ -212,11 +228,11 @@ void ChargeController(void)
+ 
+     case CHARGER_STATE_CHARGING_CV:
+         // set PWM to approach 29.4V  charge voltage
+-        if ((battery_voltage < BAT_CHARGE_CUTOFF_VOLTAGE) && (charge_voltage < (MAX_CHARGE_VOLTAGE)) && (chargecontrol_pwm_val < 1350))
++        if ((battery_voltage < charge_end_voltage) && (charge_voltage < (MAX_CHARGE_VOLTAGE)) && (chargecontrol_pwm_val < 1350))
+         {
+           chargecontrol_pwm_val++;
+         }            
+-        if ((battery_voltage > BAT_CHARGE_CUTOFF_VOLTAGE && (chargecontrol_pwm_val > 0)) || (charge_voltage > (MAX_CHARGE_VOLTAGE) && (chargecontrol_pwm_val > 39)))
++        if ((battery_voltage > charge_end_voltage && (chargecontrol_pwm_val > 0)) || (charge_voltage > (MAX_CHARGE_VOLTAGE) && (chargecontrol_pwm_val > 39)))
+         {
+           chargecontrol_pwm_val--;
+         }
+Index: Mowgli/stm32/ros_usbnode/src/ros/ros_custom/cpp_main.cpp
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/src/ros/ros_custom/cpp_main.cpp
++++ Mowgli/stm32/ros_usbnode/src/ros/ros_custom/cpp_main.cpp
+@@ -19,6 +19,7 @@
+ 
+ #include <cpp_main.h>
+ #include "panel.h"
++#include "charger.h"
+ #include "emergency.h"
+ #include "drivemotor.h"
+ #include "blademotor.h"
+@@ -64,6 +65,7 @@
+ #include "mower_msgs/EmergencyStopSrv.h"
+ #include "mower_msgs/HighLevelControlSrv.h"
+ #include "mower_msgs/HighLevelStatus.h"
++#include "mower_msgs/ChargeCtrlSrv.h"
+ 
+ #ifdef OPTION_PERIMETER
+ 	#include "perimeter.h"
+@@ -162,6 +164,7 @@ void cbGetCfg(const mowgli::GetCfgReques
+ void cbEnableMowerMotor(const mower_msgs::MowerControlSrvRequest &req, mower_msgs::MowerControlSrvResponse &res);
+ void cbSetEmergency(const mower_msgs::EmergencyStopSrvRequest &req, mower_msgs::EmergencyStopSrvResponse &res);
+ void cbReboot(const std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
++void cbChargeCtrl(const mower_msgs::ChargeCtrlSrvRequest &req, mower_msgs::ChargeCtrlSrvResponse &res);
+ 
+ // ros::ServiceServer<mowgli::SetCfgRequest, mowgli::SetCfgResponse> svcSetCfg("mowgli/SetCfg", cbSetCfg);
+ // ros::ServiceServer<mowgli::GetCfgRequest, mowgli::GetCfgResponse> svcGetCfg("mowgli/GetCfg", cbGetCfg);
+@@ -169,6 +172,7 @@ ros::ServiceServer<mower_msgs::MowerCont
+ ros::ServiceServer<mower_msgs::EmergencyStopSrvRequest, mower_msgs::EmergencyStopSrvResponse> svcSetEmergency("mower_service/emergency", cbSetEmergency);
+ ros::ServiceClient<mower_msgs::HighLevelControlSrvRequest, mower_msgs::HighLevelControlSrvResponse> svcHighLevelControl("mower_service/high_level_control");
+ ros::ServiceServer<std_srvs::Empty::Request, std_srvs::Empty::Response> svcReboot("mowgli/Reboot", cbReboot);
++ros::ServiceServer<mower_msgs::ChargeCtrlSrvRequest, mower_msgs::ChargeCtrlSrvResponse> svcChargeCtrl("mowgli/ChargeCtrl", cbChargeCtrl);
+ 
+ #ifdef OPTION_PERIMETER
+ // om perimeter signal
+@@ -646,6 +650,14 @@ void cbReboot(const std_srvs::Empty::Req
+ }
+ 
+ /*
++ *  callback for mowgli/ChargeCtrl Service
++ */
++void cbChargeCtrl(const mower_msgs::ChargeCtrlSrvRequest &req, mower_msgs::ChargeCtrlSrvResponse &res)
++{
++	charger_set_end_voltage(req.eoc);
++}
++
++/*
+  * ROS housekeeping
+  */
+ extern "C" void spinOnce()
+@@ -715,6 +727,7 @@ extern "C" void init_ROS()
+ 	nh.advertiseService(svcEnableMowerMotor);
+ 	nh.advertiseService(svcSetEmergency);
+ 	nh.advertiseService(svcReboot);
++	nh.advertiseService(svcChargeCtrl);
+ 	nh.serviceClient(svcHighLevelControl);
+ 
+ #ifdef OPTION_PERIMETER
+Index: Mowgli/stm32/ros_usbnode/src/ros/ros_lib/mower_msgs/ChargeCtrlSrv.h
+===================================================================
+--- /dev/null
++++ Mowgli/stm32/ros_usbnode/src/ros/ros_lib/mower_msgs/ChargeCtrlSrv.h
+@@ -0,0 +1,94 @@
++#ifndef _ROS_SERVICE_ChargeCtrlSrv_h
++#define _ROS_SERVICE_ChargeCtrlSrv_h
++#include <stdint.h>
++#include <string.h>
++#include <stdlib.h>
++#include "ros/msg.h"
++
++namespace mower_msgs
++{
++
++static const char CHARGECTRLSRV[] = "mowgli/ChargeCtrlSrv";
++
++  class ChargeCtrlSrvRequest : public ros::Msg
++  {
++    public:
++      typedef float _eoc_type;
++      _eoc_type eoc;
++
++    ChargeCtrlSrvRequest():
++      eoc(0.0)
++    {
++    }
++
++    virtual int serialize(unsigned char *outbuffer) const override
++    {
++      int offset = 0;
++      union {
++        float real;
++        uint32_t base;
++      } u_eoc;
++      u_eoc.real = this->eoc;
++      *(outbuffer + offset + 0) = (u_eoc.base >> (8 * 0)) & 0xFF;
++      *(outbuffer + offset + 1) = (u_eoc.base >> (8 * 1)) & 0xFF;
++      *(outbuffer + offset + 2) = (u_eoc.base >> (8 * 2)) & 0xFF;
++      *(outbuffer + offset + 3) = (u_eoc.base >> (8 * 3)) & 0xFF;
++      offset += sizeof(this->eoc);
++      return offset;
++    }
++
++    virtual int deserialize(unsigned char *inbuffer) override
++    {
++      int offset = 0;
++      union {
++        float real;
++        uint32_t base;
++      } u_eoc;
++      u_eoc.base = 0;
++      u_eoc.base |= ((uint32_t) (*(inbuffer + offset + 0))) << (8 * 0);
++      u_eoc.base |= ((uint32_t) (*(inbuffer + offset + 1))) << (8 * 1);
++      u_eoc.base |= ((uint32_t) (*(inbuffer + offset + 2))) << (8 * 2);
++      u_eoc.base |= ((uint32_t) (*(inbuffer + offset + 3))) << (8 * 3);
++      this->eoc = u_eoc.real;
++      offset += sizeof(this->eoc);
++     return offset;
++    }
++
++    virtual const char * getType() override { return CHARGECTRLSRV; };
++    virtual const char * getMD5() override { return "103ccada3ef875e8caf5690afaf72f47"; };
++
++  };
++
++  class ChargeCtrlSrvResponse : public ros::Msg
++  {
++    public:
++
++    ChargeCtrlSrvResponse()
++    {
++    }
++
++    virtual int serialize(unsigned char *outbuffer) const override
++    {
++      int offset = 0;
++      return offset;
++    }
++
++    virtual int deserialize(unsigned char *inbuffer) override
++    {
++      int offset = 0;
++     return offset;
++    }
++
++    virtual const char * getType() override { return CHARGECTRLSRV; };
++    virtual const char * getMD5() override { return "d41d8cd98f00b204e9800998ecf8427e"; };
++
++  };
++
++  class ChargeCtrlSrv {
++    public:
++    typedef ChargeCtrlSrvRequest Request;
++    typedef ChargeCtrlSrvResponse Response;
++  };
++
++}
++#endif
