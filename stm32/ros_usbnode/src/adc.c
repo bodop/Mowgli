@@ -17,6 +17,7 @@
 #include "perimeter.h"
 #include "adc.h"
 #include <math.h>
+
 /******************************************************************************
  * Module Preprocessor Constants
  *******************************************************************************/
@@ -50,6 +51,8 @@ DMA_HandleTypeDef hdma_adc1;
 RTC_HandleTypeDef hrtc = {0};
 
 ADC_Charging_channelSelection_e adc_charging_eChannelSelection = ADC_CHARGING_CHANNEL_CURRENT;
+
+DMA_HandleTypeDef hdma_adc;
 
 volatile uint16_t adc_u16BatteryVoltage       = 0;
 volatile uint16_t adc_u16Current              = 0;
@@ -354,10 +357,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 
     if (hadc == &ADC_Charging_Handle)
     {
-        if (__HAL_ADC_GET_FLAG(hadc, ADC_FLAG_OVR))
-        {
-            ovrCount++;
-        }
 #ifdef BOARD_YARDFORCE500_VARIANT_ORIG
         uint16_t l_u16Rawdata = ADC_Charging_Handle.Instance->DR;
 
@@ -402,6 +401,11 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 
         HAL_ADC_Start_IT(&ADC_Charging_Handle);
 #elif BOARD_YARDFORCE500_VARIANT_B
+        // This needs stm32f4xx_hal_adc.h
+        if (__HAL_ADC_GET_FLAG(hadc, ADC_FLAG_OVR))
+        {
+            ovrCount++;
+        }
 // EOC DMA
         adc_u16BatteryVoltage       = adc_inputDmaBuf[ADC_CHARGING_CHANNEL_BATTERYVOLTAGE];
         adc_u16Current              = adc_inputDmaBuf[ADC_CHARGING_CHANNEL_CURRENT];
