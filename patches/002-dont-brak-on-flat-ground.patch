@@ -1,0 +1,84 @@
+Index: Mowgli.dagobert/stm32/ros_usbnode/include/imu/imu.h
+===================================================================
+--- Mowgli.dagobert.orig/stm32/ros_usbnode/include/imu/imu.h
++++ Mowgli.dagobert/stm32/ros_usbnode/include/imu/imu.h
+@@ -20,10 +20,12 @@ typedef struct
+ #define MS2_PER_G               9.80665             // convert g to m/s^2 
+ #define T_PER_GAUSS             1/10000             // convert Gauss to T
+ 
++/* Last valid acceleration values (m/s^2) */
++extern float imu_last_ax,imu_last_ay,imu_last_az;
++
+ /*
+  * IMU functions that a compatible IMU needs to be able to provide
+  */
+-
+ void IMU_ReadAccelerometer(float *x, float *y, float *z);
+ void IMU_Onboard_ReadAccelerometer(float *x, float *y, float *z);
+ float IMU_Onboard_ReadTemp(void);
+Index: Mowgli.dagobert/stm32/ros_usbnode/src/drivemotor.c
+===================================================================
+--- Mowgli.dagobert.orig/stm32/ros_usbnode/src/drivemotor.c
++++ Mowgli.dagobert/stm32/ros_usbnode/src/drivemotor.c
+@@ -15,6 +15,7 @@
+  *******************************************************************************/
+ #include <string.h>
+ #include <stdlib.h>
++#include <math.h>
+ 
+ #include "stm32f_board_hal.h"
+ 
+@@ -22,8 +23,8 @@
+ #include "ros/ros_custom/cpp_main.h"
+ #include "board.h"
+ #include "adc.h"
+-
+ #include "drivemotor.h"
++#include "imu/imu.h"
+ 
+ /******************************************************************************
+  * Module Preprocessor Constants
+@@ -447,8 +448,14 @@ void DRIVEMOTOR_SetSpeed(uint8_t left_sp
+     right_speed_req = right_speed;
+     if(left_speed_req == 0 && right_speed_req ==  0)
+     {
++#ifdef EXTERNAL_IMU_ACCELERATION
++        /* Only activate the brake, if we are on uneven ground */
++        left_dir_req = right_dir_req = fabsf(imu_last_ax)>MS2_PER_G*0.125 || fabsf(imu_last_ay)>MS2_PER_G*0.0625 ? 0 : 1;
++#else
++        /* Always brake, if we do not know the accelaration */
+         left_dir_req = 0;
+         right_dir_req = 0;
++#endif
+     }
+     else
+     {
+Index: Mowgli.dagobert/stm32/ros_usbnode/src/imu/imu.c
+===================================================================
+--- Mowgli.dagobert.orig/stm32/ros_usbnode/src/imu/imu.c
++++ Mowgli.dagobert/stm32/ros_usbnode/src/imu/imu.c
+@@ -28,6 +28,11 @@ IMU_ReadGyroRaw imuReadGyroRaw=NULL;
+ float imu_cal_ax = 0.0;
+ float imu_cal_ay = 0.0;
+ float imu_cal_az = 0.0;
++
++float imu_last_ax = 0.0;
++float imu_last_ay = 0.0;
++float imu_last_az = 0.0;
++
+ /* gyro calibration values */
+ float imu_cal_gx = 0.0;
+ float imu_cal_gy = 0.0;
+@@ -78,9 +83,9 @@ void IMU_ReadAccelerometer(float *x, flo
+     float imu_x, imu_y, imu_z;
+     imuReadAccelerometerRaw(&imu_x, &imu_y, &imu_z);
+     // apply calibration
+-    *x = imu_x - imu_cal_ax;
+-    *y = imu_y - imu_cal_ay;
+-    *z = imu_z - imu_cal_az;
++    *x = imu_last_ax = imu_x - imu_cal_ax;
++    *y = imu_last_ay = imu_y - imu_cal_ay;
++    *z = imu_last_az = imu_z - imu_cal_az;
+ }
+ 
+ /*
