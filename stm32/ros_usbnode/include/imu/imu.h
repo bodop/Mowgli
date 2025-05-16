@@ -16,9 +16,9 @@ typedef struct
 /*
  * conversions to ROS units
  */
-#define RAD_PER_G               0.01745             // convert °/sec to rad/sec
-#define MS2_PER_G               9.80665             // convert g to m/s^2 
-#define T_PER_GAUSS             1/10000             // convert Gauss to T
+#define RAD_PER_G               0.0174532925f             // convert °/sec to rad/sec
+#define MS2_PER_G               9.80665f             // convert g to m/s^2 
+#define T_PER_GAUSS             (1.0f / 10000.0f)             // convert Gauss to T
 
 /* Any external IMU needs to implement the following functions and adhere to the ROS REP 103 standard (https://www.ros.org/reps/rep-0103.html) */
 typedef void (*IMU_ReadGyroRaw)(float *x, float *y, float *z);
