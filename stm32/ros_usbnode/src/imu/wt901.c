@@ -210,7 +210,7 @@ float WT901_TempRaw(void)
     // assert MSB to enable register address auto-increment
     SW_I2C_UTIL_Read_Multi(WT901_ADDRESS, TEMP, 2, (uint8_t*)&temp);
 
-retval = to_int16_be(temp[0], temp[1]) / 100.0f;
+    retval = (float)(temp[1] << 8 | temp[0])/100;
     return(retval);    
 }
 
