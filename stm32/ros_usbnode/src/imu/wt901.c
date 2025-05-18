@@ -117,8 +117,8 @@ typedef enum {
 /******************************************************************************
 * Module Variable Definitions
 *******************************************************************************/
-static inline int16_t to_int16(uint8_t low, uint8_t high) {
-    return (int16_t)((high << 8) | low);
+static inline int16_t to_int16_be_be(uint8_t msb, uint8_t lsb) {
+    return (int16_t)((msb << 8) | lsb);
 }
 /******************************************************************************
 * Function Prototypes
@@ -179,9 +179,9 @@ void WT901_ReadAccelerometerRaw(float *x, float *y, float *z)
 
     SW_I2C_UTIL_Read_Multi(WT901_ADDRESS, AX, 6, accel_xyz);
 
-    *x =  to_int16(accel_xyz[1], accel_xyz[0]) * WT901_G_FACTOR * MS2_PER_G;
-    *y =  to_int16(accel_xyz[3], accel_xyz[2]) * WT901_G_FACTOR * MS2_PER_G;
-    *z =  to_int16(accel_xyz[5], accel_xyz[4]) * WT901_G_FACTOR * MS2_PER_G;    
+    *x =  to_int16_be(accel_xyz[1], accel_xyz[0]) * WT901_G_FACTOR * MS2_PER_G;
+    *y =  to_int16_be(accel_xyz[3], accel_xyz[2]) * WT901_G_FACTOR * MS2_PER_G;
+    *z =  to_int16_be(accel_xyz[5], accel_xyz[4]) * WT901_G_FACTOR * MS2_PER_G;    
 }
 
 /**
@@ -194,9 +194,9 @@ void WT901_ReadGyroRaw(float *x, float *y, float *z)
 
     SW_I2C_UTIL_Read_Multi(WT901_ADDRESS, GX, 6, (uint8_t*)&gyro_xyz);
     
-    *x = to_int16(gyro_xyz[1], gyro_xyz[0]) * WT901_DPS_FACTOR * RAD_PER_G;
-    *y = to_int16(gyro_xyz[3], gyro_xyz[2]) * WT901_DPS_FACTOR * RAD_PER_G;
-    *z = to_int16(gyro_xyz[5], gyro_xyz[4]) * WT901_DPS_FACTOR * RAD_PER_G;    
+    *x = to_int16_be(gyro_xyz[1], gyro_xyz[0]) * WT901_DPS_FACTOR * RAD_PER_G;
+    *y = to_int16_be(gyro_xyz[3], gyro_xyz[2]) * WT901_DPS_FACTOR * RAD_PER_G;
+    *z = to_int16_be(gyro_xyz[5], gyro_xyz[4]) * WT901_DPS_FACTOR * RAD_PER_G;    
 }
 
 /**
@@ -212,7 +212,7 @@ float WT901_TempRaw(void)
     // assert MSB to enable register address auto-increment
     SW_I2C_UTIL_Read_Multi(WT901_ADDRESS, TEMP, 2, (uint8_t*)&temp);
 
-retval = to_int16(temp[0], temp[1]) / 100.0f;
+retval = to_int16_be(temp[0], temp[1]) / 100.0f;
     return(retval);    
 }
 

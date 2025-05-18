@@ -37,8 +37,8 @@ uint8_t lsm6_address = LSM6_SA0_LOW_ADDRESS;
   * @retval          0 -> test failed 1-> test ok, good to init and use
   *
   */
- static inline int16_t to_int16(uint8_t low, uint8_t high) {
-    return (int16_t)((high << 8) | low);
+ static inline int16_t to_int16_be_be(uint8_t msb, uint8_t lsb) {
+    return (int16_t)((msb << 8) | lsb);
 }
 
 uint8_t LSM6_TestDevice(void)
@@ -120,9 +120,9 @@ void LSM6_ReadAccelerometerRaw(float *x, float *y, float *z)
     debug_printf("\r\n");
 */
     if(acked) {
-        *x =  to_int16(accel_xyz[1], accel_xyz[0]) * LSM6_G_FACTOR * MS2_PER_G;
-        *y =  to_int16(accel_xyz[3], accel_xyz[2]) * LSM6_G_FACTOR * MS2_PER_G;
-        *z =  to_int16(accel_xyz[5], accel_xyz[4]) * LSM6_G_FACTOR * MS2_PER_G;    
+        *x =  to_int16_be(accel_xyz[1], accel_xyz[0]) * LSM6_G_FACTOR * MS2_PER_G;
+        *y =  to_int16_be(accel_xyz[3], accel_xyz[2]) * LSM6_G_FACTOR * MS2_PER_G;
+        *z =  to_int16_be(accel_xyz[5], accel_xyz[4]) * LSM6_G_FACTOR * MS2_PER_G;    
     }
 }
 
@@ -137,9 +137,9 @@ void LSM6_ReadGyroRaw(float *x, float *y, float *z)
     uint8_t acked = SW_I2C_UTIL_Read_Multi(lsm6_address, LSM6_OUTX_L_G, 6, (uint8_t*)&gyro_xyz);
     
     if(acked) {
-      *x = to_int16(gyro_xyz[1], gyro_xyz[0]) * LSM6_DPS_FACTOR * RAD_PER_G;
-      *y = to_int16(gyro_xyz[3], gyro_xyz[2]) * LSM6_DPS_FACTOR * RAD_PER_G;
-      *z = to_int16(gyro_xyz[5], gyro_xyz[4]) * LSM6_DPS_FACTOR * RAD_PER_G;    
+      *x = to_int16_be(gyro_xyz[1], gyro_xyz[0]) * LSM6_DPS_FACTOR * RAD_PER_G;
+      *y = to_int16_be(gyro_xyz[3], gyro_xyz[2]) * LSM6_DPS_FACTOR * RAD_PER_G;
+      *z = to_int16_be(gyro_xyz[5], gyro_xyz[4]) * LSM6_DPS_FACTOR * RAD_PER_G;    
     }
 }
 
