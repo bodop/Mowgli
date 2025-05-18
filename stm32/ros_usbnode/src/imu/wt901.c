@@ -177,9 +177,9 @@ void WT901_ReadAccelerometerRaw(float *x, float *y, float *z)
 
     SW_I2C_UTIL_Read_Multi(WT901_ADDRESS, AX, 6, accel_xyz);
 
-    *x =  to_int16_be(accel_xyz[1], accel_xyz[0]) * WT901_G_FACTOR * MS2_PER_G;
-    *y =  to_int16_be(accel_xyz[3], accel_xyz[2]) * WT901_G_FACTOR * MS2_PER_G;
-    *z =  to_int16_be(accel_xyz[5], accel_xyz[4]) * WT901_G_FACTOR * MS2_PER_G;    
+    *x =  (float)(int16_t)(accel_xyz[1] << 8 | accel_xyz[0]) * WT901_G_FACTOR * MS2_PER_G;
+    *y =  (float)(int16_t)(accel_xyz[3] << 8 | accel_xyz[2]) * WT901_G_FACTOR * MS2_PER_G;
+    *z =  (float)(int16_t)(accel_xyz[5] << 8 | accel_xyz[4]) * WT901_G_FACTOR * MS2_PER_G;    
 }
 
 /**
@@ -192,9 +192,9 @@ void WT901_ReadGyroRaw(float *x, float *y, float *z)
 
     SW_I2C_UTIL_Read_Multi(WT901_ADDRESS, GX, 6, (uint8_t*)&gyro_xyz);
     
-    *x = to_int16_be(gyro_xyz[1], gyro_xyz[0]) * WT901_DPS_FACTOR * RAD_PER_G;
-    *y = to_int16_be(gyro_xyz[3], gyro_xyz[2]) * WT901_DPS_FACTOR * RAD_PER_G;
-    *z = to_int16_be(gyro_xyz[5], gyro_xyz[4]) * WT901_DPS_FACTOR * RAD_PER_G;    
+    *x = (float)(int16_t)(gyro_xyz[1] << 8 | gyro_xyz[0]) * WT901_DPS_FACTOR * RAD_PER_G;
+    *y = (float)(int16_t)(gyro_xyz[3] << 8 | gyro_xyz[2]) * WT901_DPS_FACTOR * RAD_PER_G;
+    *z = (float)(int16_t)(gyro_xyz[5] << 8 | gyro_xyz[4]) * WT901_DPS_FACTOR * RAD_PER_G;     
 }
 
 /**

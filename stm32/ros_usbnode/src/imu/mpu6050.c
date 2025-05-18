@@ -86,9 +86,9 @@ void MPU6050_ReadAccelerometerRaw(float *x, float *y, float *z)
     uint8_t accel_xyz[6];// 2 bytes each
     SW_I2C_UTIL_Read_Multi(MPU6050_ADDRESS, MPU6050_ACCEL_XOUT_H, 6, accel_xyz);
 
-    *x = to_int16_be(accel_xyz[0], accel_xyz[1]) * MPU6050_G_FACTOR * MS2_PER_G;
-    *y = to_int16_be(accel_xyz[2], accel_xyz[3]) * MPU6050_G_FACTOR * MS2_PER_G;
-    *z = to_int16_be(accel_xyz[4], accel_xyz[5]) * MPU6050_G_FACTOR * MS2_PER_G;
+    *x =  (int16_t)(accel_xyz[0] << 8 | accel_xyz[1]) * MPU6050_G_FACTOR * MS2_PER_G;
+    *y =  (int16_t)(accel_xyz[2] << 8 | accel_xyz[3]) * MPU6050_G_FACTOR * MS2_PER_G;
+    *z =  (int16_t)(accel_xyz[4] << 8 | accel_xyz[5]) * MPU6050_G_FACTOR * MS2_PER_G;
 }
 /**
   * @brief  Reads the 3 gyro channels and stores them in *x,*y,*z
@@ -102,9 +102,9 @@ void MPU6050_ReadGyroRaw(float *x, float *y, float *z)
     uint8_t gyro_xyz[6];// 2 bytes each
     SW_I2C_UTIL_Read_Multi(MPU6050_ADDRESS, MPU6050_GYRO_XOUT_H, 6, gyro_xyz);
 
-    *x = to_int16_be(gyro_xyz[0], gyro_xyz[1]) * MPU6050_DPS_FACTOR * RAD_PER_G;
-    *y = to_int16_be(gyro_xyz[2], gyro_xyz[3]) * MPU6050_DPS_FACTOR * RAD_PER_G;
-    *z = to_int16_be(gyro_xyz[4], gyro_xyz[5]) * MPU6050_DPS_FACTOR * RAD_PER_G;
+    *x = (int16_t)(gyro_xyz[0] << 8 | gyro_xyz[1]) * MPU6050_DPS_FACTOR * RAD_PER_G;
+    *y = (int16_t)(gyro_xyz[2] << 8 | gyro_xyz[3]) * MPU6050_DPS_FACTOR * RAD_PER_G;
+    *z = (int16_t)(gyro_xyz[4] << 8 | gyro_xyz[5]) * MPU6050_DPS_FACTOR * RAD_PER_G;
 }
 
 #endif

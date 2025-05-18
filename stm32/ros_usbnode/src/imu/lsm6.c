@@ -117,9 +117,9 @@ void LSM6_ReadAccelerometerRaw(float *x, float *y, float *z)
     debug_printf("\r\n");
 */
     if(acked) {
-        *x =  to_int16_be(accel_xyz[1], accel_xyz[0]) * LSM6_G_FACTOR * MS2_PER_G;
-        *y =  to_int16_be(accel_xyz[3], accel_xyz[2]) * LSM6_G_FACTOR * MS2_PER_G;
-        *z =  to_int16_be(accel_xyz[5], accel_xyz[4]) * LSM6_G_FACTOR * MS2_PER_G;    
+        *x =  (int16_t)(accel_xyz[1] << 8 | accel_xyz[0]) * LSM6_G_FACTOR * MS2_PER_G;
+        *y =  (int16_t)(accel_xyz[3] << 8 | accel_xyz[2]) * LSM6_G_FACTOR * MS2_PER_G;
+        *z =  (int16_t)(accel_xyz[5] << 8 | accel_xyz[4]) * LSM6_G_FACTOR * MS2_PER_G;    
     }
 }
 
@@ -134,9 +134,9 @@ void LSM6_ReadGyroRaw(float *x, float *y, float *z)
     uint8_t acked = SW_I2C_UTIL_Read_Multi(lsm6_address, LSM6_OUTX_L_G, 6, (uint8_t*)&gyro_xyz);
     
     if(acked) {
-      *x = to_int16_be(gyro_xyz[1], gyro_xyz[0]) * LSM6_DPS_FACTOR * RAD_PER_G;
-      *y = to_int16_be(gyro_xyz[3], gyro_xyz[2]) * LSM6_DPS_FACTOR * RAD_PER_G;
-      *z = to_int16_be(gyro_xyz[5], gyro_xyz[4]) * LSM6_DPS_FACTOR * RAD_PER_G;    
+      *x = (int16_t)(gyro_xyz[1] << 8 | gyro_xyz[0]) * LSM6_DPS_FACTOR * RAD_PER_G;
+      *y = (int16_t)(gyro_xyz[3] << 8 | gyro_xyz[2]) * LSM6_DPS_FACTOR * RAD_PER_G;
+      *z = (int16_t)(gyro_xyz[5] << 8 | gyro_xyz[4]) * LSM6_DPS_FACTOR * RAD_PER_G;       
     }
 }
 
