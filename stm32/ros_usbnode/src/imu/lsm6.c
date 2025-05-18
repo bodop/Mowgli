@@ -37,9 +37,6 @@ uint8_t lsm6_address = LSM6_SA0_LOW_ADDRESS;
   * @retval          0 -> test failed 1-> test ok, good to init and use
   *
   */
- static inline int16_t to_int16_be_be(uint8_t msb, uint8_t lsb) {
-    return (int16_t)((msb << 8) | lsb);
-}
 
 uint8_t LSM6_TestDevice(void)
 {
