@@ -40,6 +40,7 @@ extern "C"
 #define OPTION_ULTRASONIC 0
 #define OPTION_BUMPER 0
 
+/* charge and batterie values */
 #define MAX_CHARGE_CURRENT {{.MaxChargeCurrent | printf "%.2f"}}f
 #define LIMIT_VOLTAGE_150MA {{.LimitVoltage150MA | printf "%.2f"}}f
 #define MAX_CHARGE_VOLTAGE {{.MaxChargeVoltage | printf "%.2f"}}f
@@ -51,12 +52,14 @@ extern "C"
 #define LOW_BAT_THRESHOLD 25.2f
 #define LOW_CRI_THRESHOLD 21.5f
 
+/* timing value */
 #define ONE_WHEEL_LIFT_EMERGENCY_MILLIS {{.OneWheelLiftEmergencyMillis}}
 #define BOTH_WHEELS_LIFT_EMERGENCY_MILLIS {{.BothWheelsLiftEmergencyMillis}}
 #define TILT_EMERGENCY_MILLIS {{.TiltEmergencyMillis}}
 #define STOP_BUTTON_EMERGENCY_MILLIS {{.StopButtonEmergencyMillis}}
 #define PLAY_BUTTON_CLEAR_EMERGENCY_MILLIS {{.PlayButtonClearEmergencyMillis}}
 
+/* imu */
 #define IMU_ONBOARD_INCLINATION_THRESHOLD 0x38
 #define EXTERNAL_IMU_ACCELERATION 1
 #define EXTERNAL_IMU_ANGULAR 1
@@ -72,51 +75,62 @@ extern "C"
 #define LED_GPIO_PORT GPIOB
 #define LED_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
 
+/* 24V Supply */
 #define TF4_PIN GPIO_PIN_5
 #define TF4_GPIO_PORT GPIOC
 #define TF4_GPIO_CLK_ENABLE() __HAL_RCC_GPIOC_CLK_ENABLE()
 
+/* Blade Motor nRESET - (HIGH for no RESET) */
 #define PAC5223RESET_PIN GPIO_PIN_14
 #define PAC5223RESET_GPIO_PORT GPIOE
 #define PAC5223RESET_GPIO_CLK_ENABLE() __HAL_RCC_GPIOE_CLK_ENABLE()
 
+/* Drive Motors - HC366 OE Pins (LOW to enable) */
 #define PAC5210RESET_PIN GPIO_PIN_15
 #define PAC5210RESET_GPIO_PORT GPIOE
 #define PAC5210RESET_GPIO_CLK_ENABLE() __HAL_RCC_GPIOE_CLK_ENABLE()
 
+/* Charge Control Pins - HighSide/LowSide MosFET */
 #define CHARGE_LOWSIDE_PIN GPIO_PIN_8
 #define CHARGE_HIGHSIDE_PIN GPIO_PIN_9
 #define CHARGE_GPIO_PORT GPIOE
 #define CHARGE_GPIO_CLK_ENABLE() __HAL_RCC_GPIOE_CLK_ENABLE()
 
+/* Stop button - (HIGH when pressed) */
 #define STOP_BUTTON_YELLOW_PIN GPIO_PIN_0
 #define STOP_BUTTON_YELLOW_PORT GPIOC
 #define STOP_BUTTON_GPIO_CLK_ENABLE() __HAL_RCC_GPIOC_CLK_ENABLE()
 #define STOP_BUTTON_WHITE_PIN GPIO_PIN_8
 #define STOP_BUTTON_WHITE_PORT GPIOC
 
+/* Mechanical tilt - (HIGH when set) */
 #define TILT_PIN GPIO_PIN_8
 #define TILT_PORT GPIOA
 #define TILT_GPIO_CLK_ENABLE() __HAL_RCC_GPIOA_CLK_ENABLE()
 
+/* Wheel lift - (HIGH when set) */
 #define WHEEL_LIFT_BLUE_PIN GPIO_PIN_0
 #define WHEEL_LIFT_BLUE_PORT GPIOD
 #define WHEEL_LIFT_GPIO_CLK_ENABLE() __HAL_RCC_GPIOD_CLK_ENABLE()
 #define WHEEL_LIFT_RED_PIN GPIO_PIN_1
 #define WHEEL_LIFT_RED_PORT GPIOD
 
+/* Play button - (LOW when pressed) */
 #define PLAY_BUTTON_PIN GPIO_PIN_9
 #define PLAY_BUTTON_PORT GPIOC
 #define PLAY_BUTTON_GPIO_CLK_ENABLE() __HAL_RCC_GPIOC_CLK_ENABLE()
 
+/* Home button - (LOW when pressed) */
 #define HOME_BUTTON_PIN GPIO_PIN_13
 #define HOME_BUTTON_PORT GPIOB
 #define HOME_BUTTON_GPIO_CLK_ENABLE() __HAL_RCC_GPIOC_CLK_ENABLE()
 
+/* Rain Sensor - (LOW when active) */
 #define RAIN_SENSOR_PIN GPIO_PIN_2
 #define RAIN_SENSOR_PORT GPIOE
 #define RAIN_SENSOR_GPIO_CLK_ENABLE() __HAL_RCC_GPIOE_CLK_ENABLE()
 
+/* STOP HALL Sensor - (HIGH when set) */
 #define HALLSTOP_RIGHT_PIN GPIO_PIN_2
 #define HALLSTOP_LEFT_PIN GPIO_PIN_3
 #define HALLSTOP_PORT GPIOD
@@ -132,6 +146,7 @@ extern "C"
 #define MASTER_USART_USART_CLK_ENABLE() __HAL_RCC_UART4_CLK_ENABLE()
 #define MASTER_USART_IRQ UART4_IRQn
 
+/* drive motors PAC 5210 (USART2) */
 #define DRIVEMOTORS_USART_INSTANCE USART2
 #define DRIVEMOTORS_USART_RX_PIN GPIO_PIN_6
 #define DRIVEMOTORS_USART_RX_PORT GPIOD
@@ -142,6 +157,7 @@ extern "C"
 #define DRIVEMOTORS_USART_IRQ USART2_IRQn
 #define DRIVEMOTORS_MSG_LEN 12
 
+/* blade motor PAC 5223 (USART6) */
 #define BLADEMOTOR_USART_INSTANCE USART6
 #define BLADEMOTOR_USART_RX_PIN GPIO_PIN_7
 #define BLADEMOTOR_USART_RX_PORT GPIOC
@@ -150,6 +166,7 @@ extern "C"
 #define BLADEMOTOR_USART_GPIO_CLK_ENABLE() __HAL_RCC_GPIOC_CLK_ENABLE()
 #define BLADEMOTOR_USART_USART_CLK_ENABLE() __HAL_RCC_USART6_CLK_ENABLE()
 
+/* panel (USART1) */
 #define PANEL_USART_INSTANCE USART1
 #define PANEL_USART_RX_PIN GPIO_PIN_10
 #define PANEL_USART_RX_PORT GPIOA
@@ -159,6 +176,7 @@ extern "C"
 #define PANEL_USART_USART_CLK_ENABLE() __HAL_RCC_USART1_CLK_ENABLE()
 #define PANEL_USART_IRQ USART1_IRQn
 
+// J18 has the SPI3 pins, as we dont use SPI3, we recycle them for I2C Bitbanging (for our IMU)
 #define SOFT_I2C_SCL_PIN GPIO_PIN_3
 #define SOFT_I2C_SCL_PORT GPIOB
 #define SOFT_I2C_SDA_PIN GPIO_PIN_4

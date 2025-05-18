@@ -111,7 +111,7 @@ extern "C"
 // if current is greater than this assume the battery is charging
 #define MIN_CHARGE_CURRENT 0.1f
 #define LOW_BAT_THRESHOLD 25.2f /* near 20% SOC */
-#define LOW_CRI_THRESHOLD 23.5f /* near 0% SOC */
+#define LOW_CRI_THRESHOLD 21.5f /* near 0% SOC */
 
 // Emergency sensor timeouts
 #define ONE_WHEEL_LIFT_EMERGENCY_MILLIS 10000
