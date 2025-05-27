@@ -67,7 +67,7 @@ extern "C"
 #define BLADEMOTOR_LENGTH_RECEIVED_MSG 16
 #define DEBUG_TYPE DEBUG_TYPE_SWO
 
-#define MAX_MPS 0.5		  // Allow maximum speed of 1.0 m/s
+#define MAX_MPS 0.3		  // Allow maximum speed of 1.0 m/s
 #define PWM_PER_MPS 300.0 // PWM value of 300 means 1 m/s bot speed so we divide by 4 to have correct robot speed but still progressive speed
 #define TICKS_PER_M 300.0 // Motor Encoder ticks per meter
 #define WHEEL_BASE  0.325		// The distance between the center of the wheels in meters
@@ -100,7 +100,7 @@ extern "C"
 /// Max voltage allowed 29.4
 #define MAX_CHARGE_VOLTAGE 29.2f
 /// Max battery voltage allowed
-#define BAT_CHARGE_CUTOFF_VOLTAGE 28.15f
+#define BAT_CHARGE_CUTOFF_VOLTAGE 29.15f
 /// We consider the battery is full when in CV mode the current below 0.1A
 #define CHARGE_END_LIMIT_CURRENT 0.08f
 // if voltage is greater than this assume we are docked
