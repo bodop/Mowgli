@@ -284,7 +284,7 @@ void ADC_input(void)
     /*calculation for NTC temperature*/
     l_fTmp = ntc_voltage * 10000.0f;               //Resistance of RT
     l_fTmp = log(l_fTmp / f_RTO);
-    l_fTmp = (1 / ((l_fTmp / beta) + (1.0f / (273.15f+25.0f)))); //Temperature from thermistor
+    l_fTmp = (1.0f / ((l_fTmp / beta) + (1.0f / (273.15f+25.0f)))); //Temperature from thermistor
     blade_temperature = l_fTmp - 273.15f;                 //Conversion to Celsius  
 
     /* Input voltage from the external supply*/

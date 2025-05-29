@@ -78,7 +78,7 @@ extern "C"
 /// nominal max charge current is 1.0 Amp
 #define MAX_CHARGE_CURRENT 1.4f
 /// limite voltag when switching in 150mA mode
-#define LIMIT_VOLTAGE_150MA 29.0f
+//#define LIMIT_VOLTAGE_150MA 29.0f
 /// Max voltage allowed 29.4
 #define MAX_CHARGE_VOLTAGE 29.2f
 /// Max battery voltage allowed

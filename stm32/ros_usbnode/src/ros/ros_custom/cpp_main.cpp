@@ -24,11 +24,7 @@
 #include "drivemotor.h"
 #include "blademotor.h"
 #include "ultrasonic_sensor.h"
-#ifdef BOARD_YARDFORCE500_VARIANT_ORIG
-  #include "stm32f1xx_hal.h"
-#elif BOARD_YARDFORCE500_VARIANT_B
-  #include "stm32f4xx_hal.h"
-#endif
+#include "stm32f_board_hal.h"
 #include "ringbuffer.h"
 #include "ros.h"
 #include "ros/time.h"
