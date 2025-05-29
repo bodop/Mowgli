@@ -25,30 +25,30 @@ IMU_ReadAccelerometerRaw imuReadAccelerometerRaw=NULL;
 IMU_ReadGyroRaw imuReadGyroRaw=NULL;
 
 /* accelerometer calibration values */
-float imu_cal_ax = 0.0;
-float imu_cal_ay = 0.0;
-float imu_cal_az = 0.0;
+float imu_cal_ax = 0.0f;
+float imu_cal_ay = 0.0f;
+float imu_cal_az = 0.0f;
 /* gyro calibration values */
-float imu_cal_gx = 0.0;
-float imu_cal_gy = 0.0;
-float imu_cal_gz = 0.0;
+float imu_cal_gx = 0.0f;
+float imu_cal_gy = 0.0f;
+float imu_cal_gz = 0.0f;
 /* onboard accelerometer calibration values */
-float onboard_imu_cal_ax = 0.0;
-float onboard_imu_cal_ay = 0.0;
-float onboard_imu_cal_az = 0.0;
+float onboard_imu_cal_ax = 0.0f;
+float onboard_imu_cal_ay = 0.0f;
+float onboard_imu_cal_az = 0.0f;
 
 /* covariance matrixes for IMU data */
-float imu_cov_ax = 0.01;
-float imu_cov_ay = 0.01;
-float imu_cov_az = 0.01;
+float imu_cov_ax = 0.01f;
+float imu_cov_ay = 0.01f;
+float imu_cov_az = 0.01f;
 // ---------------------
-float imu_cov_gx = 0.1;
-float imu_cov_gy = 0.1;
-float imu_cov_gz = 0.1;
+float imu_cov_gx = 0.1f;
+float imu_cov_gy = 0.1f;
+float imu_cov_gz = 0.1f;
 // ---------------------
-float onboard_imu_cov_ax = 0.01;
-float onboard_imu_cov_ay = 0.01;
-float onboard_imu_cov_az = 0.01;
+float onboard_imu_cov_ax = 0.01f;
+float onboard_imu_cov_ay = 0.01f;
+float onboard_imu_cov_az = 0.01f;
 // ---------------------
 
 static int assertAccelerometer() {

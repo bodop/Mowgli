@@ -14,7 +14,6 @@
 #define MPU6050_GYRO_XOUT_H    0x43
 #define MPU6050_PWR_MGMT_1     0x6b
 #define MPU6050_WHO_AM_I       0x75
-
 #define MPU6500_WHO_AM_I           0x70
 #define MPU9250_WHO_AM_I           0x71
 #define MPU9255_WHO_AM_I           0x73
