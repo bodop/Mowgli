@@ -19,11 +19,16 @@
 
 #include <cpp_main.h>
 #include "panel.h"
+#include "charger.h"
 #include "emergency.h"
 #include "drivemotor.h"
 #include "blademotor.h"
 #include "ultrasonic_sensor.h"
-#include "stm32f_board_hal.h"
+#ifdef BOARD_YARDFORCE500_VARIANT_ORIG
+  #include "stm32f1xx_hal.h"
+#elif BOARD_YARDFORCE500_VARIANT_B
+  #include "stm32f4xx_hal.h"
+#endif
 #include "ringbuffer.h"
 #include "ros.h"
 #include "ros/time.h"
@@ -57,13 +62,16 @@
 
 // Status message
 #include "mowgli/status.h"
-#include "mowgli/WheelTick.h"
-
+#include "geometry_msgs/TwistStamped.h"
+#include "mower_msgs/Emergency.h"
+#include "mower_msgs/ESCStatus.h"
+#include "mower_msgs/Power.h"
 #include "mower_msgs/Status.h"
 #include "mower_msgs/MowerControlSrv.h"
 #include "mower_msgs/EmergencyStopSrv.h"
 #include "mower_msgs/HighLevelControlSrv.h"
 #include "mower_msgs/HighLevelStatus.h"
+#include "mower_msgs/ChargeCtrlSrv.h"
 
 #ifdef OPTION_PERIMETER
 	#include "perimeter.h"
@@ -97,8 +105,6 @@ ros::NodeHandle nh;
 
 float imu_onboard_temperature; // cached temp value, so we dont poll I2C constantly
 
-std_msgs::Int16MultiArray buttonstate_msg;
-
 #if OPTION_ULTRASONIC == 1
 /* ultrasonic sensors */
 sensor_msgs::Range ultrasonic_left_msg;
@@ -120,23 +126,30 @@ sensor_msgs::Imu imu_onboard_msg;
 // mowgli status message
 mowgli::status status_msg;
 // om status message
+mower_msgs::Emergency om_mower_emergency_msg;
+mower_msgs::Power om_mower_power_msg;
 mower_msgs::Status om_mower_status_msg;
+mower_msgs::ESCStatus leftEscStatus;
+mower_msgs::ESCStatus rightEscStatus;
 
-xbot_msgs::WheelTick wheel_ticks_msg;
+geometry_msgs::TwistStamped measured_twist_msg;
 mower_msgs::HighLevelStatus high_level_status;
 float clamp(float d, float min, float max);
 /*
  * PUBLISHERS
  */
-ros::Publisher pubButtonState("buttonstate", &buttonstate_msg);
-ros::Publisher pubOMStatus("mower/status", &om_mower_status_msg);
-ros::Publisher pubWheelTicks("/mower/wheel_ticks", &wheel_ticks_msg);
+ros::Publisher pubOMEmergency("ll/emergency", &om_mower_emergency_msg);
+ros::Publisher pubOMPower("ll/power", &om_mower_power_msg);
+ros::Publisher pubOMStatus("ll/mower_status", &om_mower_status_msg);
+ros::Publisher pubMeasuredTwist("ll/diff_drive/measured_twist", &measured_twist_msg);
+ros::Publisher pubLeftEscStatus("ll/diff_drive/left_esc_status",&leftEscStatus);
+ros::Publisher pubRightEscStatus("ll/diff_drive/right_esc_status",&rightEscStatus);
 #ifdef ROS_PUBLISH_MOWGLI
 ros::Publisher pubStatus("mowgli/status", &status_msg);
 #endif
 
 // IMU external
-ros::Publisher pubIMU("imu/data_raw", &imu_msg);
+ros::Publisher pubIMU("ll/imu/data_raw", &imu_msg);
 
 #if OPTION_ULTRASONIC == 1
 ros::Publisher pubLeftUltrasonic("ultrasonic/left", &ultrasonic_left_msg);
@@ -153,7 +166,7 @@ ros::Publisher pubRightBumper("bumper/right", &bumper_left_msg);
  */
 extern "C" void CommandVelocityMessageCb(const geometry_msgs::Twist &msg);
 extern "C" void CommandHighLevelStatusMessageCb(const mower_msgs::HighLevelStatus &msg);
-ros::Subscriber<geometry_msgs::Twist> subCommandVelocity("cmd_vel", CommandVelocityMessageCb);
+ros::Subscriber<geometry_msgs::Twist> subCommandVelocity("ll/cmd_vel", CommandVelocityMessageCb);
 ros::Subscriber<mower_msgs::HighLevelStatus> subCommandHighLevelStatus("mower_logic/current_state", CommandHighLevelStatusMessageCb);
 
 // SERVICES
@@ -162,13 +175,15 @@ void cbGetCfg(const mowgli::GetCfgRequest &req, mowgli::GetCfgResponse &res);
 void cbEnableMowerMotor(const mower_msgs::MowerControlSrvRequest &req, mower_msgs::MowerControlSrvResponse &res);
 void cbSetEmergency(const mower_msgs::EmergencyStopSrvRequest &req, mower_msgs::EmergencyStopSrvResponse &res);
 void cbReboot(const std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+void cbChargeCtrl(const mower_msgs::ChargeCtrlSrvRequest &req, mower_msgs::ChargeCtrlSrvResponse &res);
 
 // ros::ServiceServer<mowgli::SetCfgRequest, mowgli::SetCfgResponse> svcSetCfg("mowgli/SetCfg", cbSetCfg);
 // ros::ServiceServer<mowgli::GetCfgRequest, mowgli::GetCfgResponse> svcGetCfg("mowgli/GetCfg", cbGetCfg);
-ros::ServiceServer<mower_msgs::MowerControlSrvRequest, mower_msgs::MowerControlSrvResponse> svcEnableMowerMotor("mower_service/mow_enabled", cbEnableMowerMotor);
-ros::ServiceServer<mower_msgs::EmergencyStopSrvRequest, mower_msgs::EmergencyStopSrvResponse> svcSetEmergency("mower_service/emergency", cbSetEmergency);
+ros::ServiceServer<mower_msgs::MowerControlSrvRequest, mower_msgs::MowerControlSrvResponse> svcEnableMowerMotor("ll/_service/mow_enabled", cbEnableMowerMotor);
+ros::ServiceServer<mower_msgs::EmergencyStopSrvRequest, mower_msgs::EmergencyStopSrvResponse> svcSetEmergency("ll/_service/emergency", cbSetEmergency);
 ros::ServiceClient<mower_msgs::HighLevelControlSrvRequest, mower_msgs::HighLevelControlSrvResponse> svcHighLevelControl("mower_service/high_level_control");
 ros::ServiceServer<std_srvs::Empty::Request, std_srvs::Empty::Response> svcReboot("mowgli/Reboot", cbReboot);
+ros::ServiceServer<mower_msgs::ChargeCtrlSrvRequest, mower_msgs::ChargeCtrlSrvResponse> svcChargeCtrl("mowgli/ChargeCtrl", cbChargeCtrl);
 
 #ifdef OPTION_PERIMETER
 // om perimeter signal
@@ -481,19 +496,34 @@ extern "C" void ultrasonic_handler(void)
  */
 extern "C" void wheelTicks_handler(int8_t p_u8LeftDirection, int8_t p_u8RightDirection, uint32_t p_u16LeftTicks, uint32_t p_u16RightTicks, int16_t p_s16LeftSpeed, int16_t p_s16RightSpeed)
 {
-	wheel_ticks_msg.stamp = nh.now();
-	wheel_ticks_msg.wheel_tick_factor = TICKS_PER_M;
-	wheel_ticks_msg.valid_wheels = 0x0C;
-	wheel_ticks_msg.wheel_direction_fl = 0;
-	wheel_ticks_msg.wheel_ticks_fl = (int32_t)p_s16LeftSpeed;
-	wheel_ticks_msg.wheel_direction_fr = 0;
-	wheel_ticks_msg.wheel_ticks_fr = (int32_t)p_s16RightSpeed;
-	wheel_ticks_msg.wheel_direction_rl = (p_u8LeftDirection == -1) ? 1 : 0;
-	wheel_ticks_msg.wheel_ticks_rl = p_u16LeftTicks;
-	wheel_ticks_msg.wheel_direction_rr = (p_u8RightDirection == -1) ? 1 : 0;
-	wheel_ticks_msg.wheel_ticks_rr = p_u16RightTicks;
-
-	pubWheelTicks.publish(&wheel_ticks_msg);
+	static int haveLast=0;
+	static uint32_t lastLeftTicks,lastRightTicks;
+	ros::Time now=nh.now();
+	if (haveLast) {
+		double dt = now.toSec() - measured_twist_msg.header.stamp.toSec();
+		if (dt>0) {
+    		double dl=((double) (p_u16LeftTicks-lastLeftTicks))/TICKS_PER_M;
+    		double dr=((double) (p_u16RightTicks-lastRightTicks))/TICKS_PER_M;
+			if (p_u8LeftDirection==-1) dl=-dl;
+			if (p_u8RightDirection==-1) dr=-dr;
+    		measured_twist_msg.header.frame_id = "base_link";
+    		measured_twist_msg.header.stamp = now;
+    		measured_twist_msg.header.seq++;
+    		if (abs(measured_twist_msg.twist.linear.x = (dl+dr)/(2*dt))>1.0) {
+				/* Treat high velocity as an error */
+				measured_twist_msg.twist.linear.x=
+	    		measured_twist_msg.twist.angular.z=0;
+			} else {
+	    		measured_twist_msg.twist.angular.z = (dr-dl)/(WHEEL_BASE*dt);
+			}
+	        pubMeasuredTwist.publish(&measured_twist_msg);
+		}
+	} else {
+    	measured_twist_msg.header.stamp = now;
+		haveLast=1;
+	}
+	lastLeftTicks=p_u16LeftTicks;
+	lastRightTicks=p_u16RightTicks;
 }
 
 extern "C" void broadcast_handler()
@@ -585,33 +615,41 @@ extern "C" void broadcast_handler()
 
 		om_mower_status_msg.stamp = nh.now();
 		om_mower_status_msg.mower_status = mower_msgs::Status::MOWER_STATUS_OK;
-		om_mower_status_msg.raspberry_pi_power = true;
-		om_mower_status_msg.gps_power = true;
-		om_mower_status_msg.esc_power = true;
-
 		om_mower_status_msg.rain_detected = RAIN_Sense();
-		om_mower_status_msg.emergency = Emergency_State();
-		om_mower_status_msg.v_charge = chargerInputVoltage;
-		om_mower_status_msg.charge_current = current;
-		om_mower_status_msg.v_battery = battery_voltage;
-		om_mower_status_msg.left_esc_status.current = (float)left_power/100;
-		om_mower_status_msg.left_esc_status.tacho =
-		om_mower_status_msg.left_esc_status.rpm = left_wheel_speed_val;
-
-		om_mower_status_msg.right_esc_status.current = (float)right_power/100;
-		om_mower_status_msg.right_esc_status.tacho =
-		om_mower_status_msg.right_esc_status.rpm = right_wheel_speed_val;
-
-		om_mower_status_msg.mow_esc_status.temperature_motor = blade_temperature;
-		om_mower_status_msg.mow_esc_status.tacho =
-		om_mower_status_msg.mow_esc_status.rpm = BLADEMOTOR_u16RPM;
-		om_mower_status_msg.mow_esc_status.current = (float)BLADEMOTOR_u16Power / 1000.0;
-		om_mower_status_msg.mow_esc_status.temperature_pcb = BLADEMOTOR_u32Error;
-		om_mower_status_msg.mow_esc_status.status = mower_msgs::ESCStatus::ESC_STATUS_OK;
-		om_mower_status_msg.left_esc_status.status = mower_msgs::ESCStatus::ESC_STATUS_OK;
-		om_mower_status_msg.right_esc_status.status = mower_msgs::ESCStatus::ESC_STATUS_OK;
+		om_mower_status_msg.mower_motor_temperature = blade_temperature;
+		om_mower_status_msg.mower_motor_rpm = (float) BLADEMOTOR_u16RPM;
+		om_mower_status_msg.mower_esc_current = (float) BLADEMOTOR_u16Power / 1000.0;
+		om_mower_status_msg.mower_esc_temperature = (float) BLADEMOTOR_u32Error;
 		om_mower_status_msg.mow_enabled = target_blade_on_off;
 		pubOMStatus.publish(&om_mower_status_msg);
+
+		om_mower_power_msg.stamp=om_mower_status_msg.stamp;
+		om_mower_power_msg.v_charge=chargerInputVoltage;
+		om_mower_power_msg.v_battery=battery_voltage;
+		om_mower_power_msg.charge_current=current;
+		om_mower_power_msg.charger_enabled=chargecontrol_is_charging;
+		om_mower_power_msg.charger_status="N/A";
+		pubOMPower.publish(&om_mower_power_msg);
+
+		leftEscStatus.current=left_power;
+		leftEscStatus.status = mower_msgs::ESCStatus::ESC_STATUS_OK;
+		pubLeftEscStatus.publish(&leftEscStatus);
+		rightEscStatus.current=right_power;
+		rightEscStatus.status = mower_msgs::ESCStatus::ESC_STATUS_OK;
+		pubRightEscStatus.publish(&rightEscStatus);
+
+		{
+			static uint8_t delay=4;
+			uint8_t emergency=Emergency_State();
+			delay--;
+			if (!delay || emergency!=om_mower_emergency_msg.active_emergency) {
+				om_mower_emergency_msg.stamp=om_mower_status_msg.stamp;
+				om_mower_emergency_msg.active_emergency=om_mower_emergency_msg.latched_emergency=emergency;
+				/* No reason yet */
+				pubOMEmergency.publish(&om_mower_emergency_msg);
+				delay=4;
+			}
+		}
 
 	}
 	// if (NBT_handler(&status_nbt))
@@ -654,6 +692,14 @@ void cbReboot(const std_srvs::Empty::Request &req, std_srvs::Empty::Response &re
 {
 	// debug_printf("cbReboot:\r\n");
 	reboot_flag = true;
+}
+
+/*
+ *  callback for mowgli/ChargeCtrl Service
+ */
+void cbChargeCtrl(const mower_msgs::ChargeCtrlSrvRequest &req, mower_msgs::ChargeCtrlSrvResponse &res)
+{
+	charger_set_end_voltage(req.eoc);
 }
 
 /*
@@ -708,13 +754,16 @@ extern "C" void init_ROS()
 	nh.advertise(pubRightBumper);
 #endif
 
-	nh.advertise(pubButtonState);
 	nh.advertise(pubIMU);
 #ifdef ROS_PUBLISH_MOWGLI
 	nh.advertise(pubStatus);
 #endif
+        nh.advertise(pubOMEmergency);
+        nh.advertise(pubOMPower);
 	nh.advertise(pubOMStatus);
-	nh.advertise(pubWheelTicks);
+	nh.advertise(pubLeftEscStatus);
+	nh.advertise(pubRightEscStatus);
+	nh.advertise(pubMeasuredTwist);
 
 	// Initialize Subscribers
 	nh.subscribe(subCommandVelocity);
@@ -726,6 +775,7 @@ extern "C" void init_ROS()
 	nh.advertiseService(svcEnableMowerMotor);
 	nh.advertiseService(svcSetEmergency);
 	nh.advertiseService(svcReboot);
+	nh.advertiseService(svcChargeCtrl);
 	nh.serviceClient(svcHighLevelControl);
 
 #ifdef OPTION_PERIMETER
