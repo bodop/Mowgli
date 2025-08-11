@@ -10,7 +10,7 @@ Index: Mowgli.gitta/stm32/ros_usbnode/src/ros/ros_lib/mower_msgs/Status.h
  
  namespace mower_msgs
  {
-@@ -18,39 +17,37 @@ namespace mower_msgs
+@@ -18,329 +17,99 @@ namespace mower_msgs
        _stamp_type stamp;
        typedef uint8_t _mower_status_type;
        _mower_status_type mower_status;
@@ -18,9 +18,10 @@ Index: Mowgli.gitta/stm32/ros_usbnode/src/ros/ros_lib/mower_msgs/Status.h
 +      typedef uint8_t _raspberry_pi_power_type;
        _raspberry_pi_power_type raspberry_pi_power;
 -      typedef bool _gps_power_type;
-+      typedef uint8_t _gps_power_type;
-       _gps_power_type gps_power;
+-      _gps_power_type gps_power;
 -      typedef bool _esc_power_type;
++      typedef uint8_t _is_charging_type;
++      _is_charging_type is_charging;
 +      typedef uint8_t _esc_power_type;
        _esc_power_type esc_power;
 -      typedef bool _rain_detected_type;
@@ -73,7 +74,12 @@ Index: Mowgli.gitta/stm32/ros_usbnode/src/ros/ros_lib/mower_msgs/Status.h
  
      Status():
        stamp(),
-@@ -62,285 +59,57 @@ namespace mower_msgs
+       mower_status(0),
+       raspberry_pi_power(0),
+-      gps_power(0),
++      is_charging(0),
+       esc_power(0),
+       rain_detected(0),
        sound_module_available(0),
        sound_module_busy(0),
        ui_board_available(0),
@@ -220,7 +226,7 @@ Index: Mowgli.gitta/stm32/ros_usbnode/src/ros/ros_lib/mower_msgs/Status.h
 +      int offset=serializeTime(outbuffer,this->stamp);
 +      offset+=serializeUint8(outbuffer+offset,this->mower_status);
 +      offset+=serializeUint8(outbuffer+offset,this->raspberry_pi_power);
-+      offset+=serializeUint8(outbuffer+offset,this->gps_power);
++      offset+=serializeUint8(outbuffer+offset,this->is_charging);
 +      offset+=serializeUint8(outbuffer+offset,this->esc_power);
 +      offset+=serializeUint8(outbuffer+offset,this->rain_detected);
 +      offset+=serializeUint8(outbuffer+offset,this->sound_module_available);
@@ -375,7 +381,7 @@ Index: Mowgli.gitta/stm32/ros_usbnode/src/ros/ros_lib/mower_msgs/Status.h
 +      int offset=deserializeTime(inbuffer,&this->stamp);
 +      offset+=deserializeUint8(inbuffer+offset,&this->mower_status);
 +      offset+=deserializeUint8(inbuffer+offset,&this->raspberry_pi_power);
-+      offset+=deserializeUint8(inbuffer+offset,&this->gps_power);
++      offset+=deserializeUint8(inbuffer+offset,&this->is_charging);
 +      offset+=deserializeUint8(inbuffer+offset,&this->esc_power);
 +      offset+=deserializeUint8(inbuffer+offset,&this->rain_detected);
 +      offset+=deserializeUint8(inbuffer+offset,&this->sound_module_available);
@@ -392,7 +398,7 @@ Index: Mowgli.gitta/stm32/ros_usbnode/src/ros/ros_lib/mower_msgs/Status.h
  
      virtual const char * getType() override { return "mower_msgs/Status"; };
 -    virtual const char * getMD5() override { return "3878b70bc9c3008ce9c808b5392f58be"; };
-+    virtual const char * getMD5() override { return "f0436eea58ffe66343cd2a3715ac406d"; };
++    virtual const char * getMD5() override { return "5b038ed6144dd306d00a868172f69576"; };
  
    };
  
@@ -526,7 +532,7 @@ Index: Mowgli.gitta/stm32/ros_usbnode/src/ros/ros_custom/cpp_main.cpp
  }
  
  extern "C" void broadcast_handler()
-@@ -590,23 +612,41 @@ extern "C" void broadcast_handler()
+@@ -590,23 +612,42 @@ extern "C" void broadcast_handler()
  		om_mower_status_msg.stamp = nh.now();
  		om_mower_status_msg.mower_status = mower_msgs::Status::MOWER_STATUS_OK;
  		om_mower_status_msg.rain_detected = RAIN_Sense();
@@ -544,6 +550,7 @@ Index: Mowgli.gitta/stm32/ros_usbnode/src/ros/ros_custom/cpp_main.cpp
 -		om_mower_status_msg.mow_esc_status.status = mower_msgs::ESCStatus::ESC_STATUS_OK;
 -		om_mower_status_msg.left_esc_status.status = mower_msgs::ESCStatus::ESC_STATUS_OK;
 -		om_mower_status_msg.right_esc_status.status = mower_msgs::ESCStatus::ESC_STATUS_OK;
++		om_mower_status_msg.is_charging=chargecontrol_is_charging;
 +		om_mower_status_msg.mower_motor_temperature = blade_temperature;
 +		om_mower_status_msg.mower_motor_rpm = (float) BLADEMOTOR_u16RPM;
 +		om_mower_status_msg.mower_esc_current = (float) BLADEMOTOR_u16Power / 1000.0;
@@ -582,7 +589,7 @@ Index: Mowgli.gitta/stm32/ros_usbnode/src/ros/ros_custom/cpp_main.cpp
  	}
  	// if (NBT_handler(&status_nbt))
  }
-@@ -710,13 +750,16 @@ extern "C" void init_ROS()
+@@ -710,13 +751,16 @@ extern "C" void init_ROS()
  	nh.advertise(pubRightBumper);
  #endif
  
