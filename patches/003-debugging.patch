@@ -1,0 +1,26 @@
+Index: Mowgli/stm32/ros_usbnode/include/board.h
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/include/board.h
++++ Mowgli/stm32/ros_usbnode/include/board.h
+@@ -26,7 +26,7 @@ extern "C"
+ #define DEBUG_TYPE_SWO 2
+ 
+ /* Publish Mowgli Topics */
+-//#define ROS_PUBLISH_MOWGLI
++#define ROS_PUBLISH_MOWGLI
+ 
+ /* different type of panel are possible */
+ #define PANEL_TYPE_NONE 0
+Index: Mowgli/stm32/ros_usbnode/src/ros/ros_lib/mowgli/status.h
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/src/ros/ros_lib/mowgli/status.h
++++ Mowgli/stm32/ros_usbnode/src/ros/ros_lib/mowgli/status.h
+@@ -496,7 +496,7 @@ namespace mowgli
+     }
+ 
+     virtual const char * getType() override { return "mowgli/status"; };
+-    virtual const char * getMD5() override { return "418736499e2bb604463e948b427be2c1"; };
++    virtual const char * getMD5() override { return "dc99c2a406a9f90de38ea5a852dc2c51"; };
+ 
+   };
+ 

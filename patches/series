@@ -1,3 +1,4 @@
 000-use-perimeter.patch
 001-comms-v2
 002-dont-brak-on-flat-ground.patch
+003-debugging.patch
