@@ -57,7 +57,7 @@ Index: Mowgli/stm32/ros_usbnode/src/imu/imu.c
 ===================================================================
 --- Mowgli.orig/stm32/ros_usbnode/src/imu/imu.c
 +++ Mowgli/stm32/ros_usbnode/src/imu/imu.c
-@@ -28,6 +28,11 @@ IMU_ReadGyroRaw imuReadGyroRaw=NULL;
+@@ -29,6 +29,11 @@ IMU_ReadGyroRaw imuReadGyroRaw=NULL;
  float imu_cal_ax = 0.0;
  float imu_cal_ay = 0.0;
  float imu_cal_az = 0.0;
@@ -69,7 +69,7 @@ Index: Mowgli/stm32/ros_usbnode/src/imu/imu.c
  /* gyro calibration values */
  float imu_cal_gx = 0.0;
  float imu_cal_gy = 0.0;
-@@ -78,9 +83,9 @@ void IMU_ReadAccelerometer(float *x, flo
+@@ -79,9 +84,9 @@ void IMU_ReadAccelerometer(float *x, flo
      float imu_x, imu_y, imu_z;
      imuReadAccelerometerRaw(&imu_x, &imu_y, &imu_z);
      // apply calibration
