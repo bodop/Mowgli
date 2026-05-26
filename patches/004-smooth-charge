@@ -1,0 +1,71 @@
+Index: Mowgli/stm32/ros_usbnode/src/charger.c
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/src/charger.c
++++ Mowgli/stm32/ros_usbnode/src/charger.c
+@@ -182,6 +182,7 @@ static float charge_end_voltage=BAT_CHAR
+ void ChargeController(void)
+ {                        
+   static uint32_t timestamp = 0;
++  static float charge_avg=0;
+ 
+   /*charger disconnected force idle state*/
+   if(( chargerInputVoltage < MIN_DOCKED_VOLTAGE) ){
+@@ -210,6 +211,8 @@ void ChargeController(void)
+         break;
+ 
+     case CHARGER_STATE_CHARGING_CC:
++        charge_avg=charge_avg*0.9+charge_voltage*0.1;
++
+         // cap charge current at 1.5 Amps
+         if ((battery_voltage > charge_end_voltage && (chargecontrol_pwm_val > 0)) || ((current > MAX_CHARGE_CURRENT) && (chargecontrol_pwm_val > 39)))
+         {
+@@ -220,7 +223,8 @@ void ChargeController(void)
+             chargecontrol_pwm_val++;
+         }
+ 
+-        if(charge_voltage >= charge_end_voltage) {
++        if(charge_avg >= charge_end_voltage) {
++            charge_avg=0;
+             charger_state = CHARGER_STATE_CHARGING_CV;
+         }
+ 
+Index: Mowgli/stm32/ros_usbnode/src/adc.c
+===================================================================
+--- Mowgli.orig/stm32/ros_usbnode/src/adc.c
++++ Mowgli/stm32/ros_usbnode/src/adc.c
+@@ -264,22 +264,22 @@ void ADC_input(void)
+ 
+     /* battery volatge calculation */
+     l_fTmp = ((float)adc_u16BatteryVoltage / 4095.0f) * 3.3f * 10.09 + 0.6f;
+-    battery_voltage = 0.2 * l_fTmp + 0.8 * battery_voltage;
++    battery_voltage = 0.1 * l_fTmp + 0.9 * battery_voltage;
+ 
+      /*charger voltage calculation */
+     l_fTmp = ((float)adc_u16ChargerVoltage / 4095.0f) * 3.3f * 16;
+-    charge_voltage = 0.8 * l_fTmp + 0.2 * charge_voltage;
++    charge_voltage = 0.1 * l_fTmp + 0.9 * charge_voltage;
+ 
+     /*charge current calculation */
+     l_fTmp = (((float)adc_u16Current / 4095.0f) * 3.3f - 2.5f) * 100 / 12.0;
+-    current_without_offset =   0.8 * l_fTmp + 0.2 * current_without_offset;          
++    current_without_offset =   0.1 * l_fTmp + 0.9 * current_without_offset;          
+ 
+     /*remove offset*/
+     current = current_without_offset - charge_current_offset.f;
+ 
+     /*blade motor temperature calculation */
+     l_fTmp = (adc_u16Input_NTC/4095.0f)*3.3f;
+-    ntc_voltage = 0.5*l_fTmp + 0.5*ntc_voltage;
++    ntc_voltage = 0.1*l_fTmp + 0.9*ntc_voltage;
+ 
+     /*calculation for NTC temperature*/
+     l_fTmp = ntc_voltage * 10000;               //Resistance of RT
+@@ -289,7 +289,7 @@ void ADC_input(void)
+ 
+     /* Input voltage from the external supply*/
+     l_fTmp = (adc_u16ChargerInputVoltage / 4095.0f) * 3.3f * (32 / 2);
+-    chargerInputVoltage = 0.5 * l_fTmp + 0.5 * chargerInputVoltage;
++    chargerInputVoltage = 0.1 * l_fTmp + 0.9 * chargerInputVoltage;
+ 
+ }
+ 
